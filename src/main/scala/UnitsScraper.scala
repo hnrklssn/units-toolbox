@@ -26,8 +26,8 @@ object UnitsScraper2 {
   def main(args: Array[String]): Unit = {
     val ois: Try[ClassLoaderObjectInputStream] = Try(new ClassLoaderObjectInputStream(classLoader = classOf[AuctionObject].getClassLoader,
                                                                       inputStream = new FileInputStream(oldObjectsPath)))
-    val readObjects: Option[HashSet[AuctionObject]] = ois match {
-      case Success(stream) => Try(stream.readObject.asInstanceOf[HashSet[AuctionObject]]) match {
+    val readObjects: Option[TrieMap[String, HashSet[AuctionObject]]] = ois match {
+      case Success(stream) => Try(stream.readObject.asInstanceOf[TrieMap[String, HashSet[AuctionObject]]]) match {
         case Success(set) => stream.close; Some(set)
         case Failure(_) => println("Error, malformed file"); System.exit(2); None //TODO: Handle error acceptably
       }
@@ -35,20 +35,25 @@ object UnitsScraper2 {
         case e: FileNotFoundException => None
       }
     }
-    val oldObjects: HashSet[AuctionObject] = readObjects match {
+    val oldObjects: TrieMap[String, HashSet[AuctionObject]] = readObjects match {
       case Some(s) => s
-      case None => new HashSet[AuctionObject]
+      case None => new TrieMap[String, HashSet[AuctionObject]]
     }
     val searchTermSource = scala.io.Source.fromFile("search_terms.txt")
-    val searchTerms: Iterator[String] = searchTermSource getLines
-    val results = new HashSet[AuctionObject]
-    for (sT <- searchTerms) results ++= new UnitsScraper().search(sT) //TODO: categorize based on search term
-    val newResults = results &~ oldObjects
+    val searchTerms: Iterator[String] = searchTermSource.getLines
+    val results = new TrieMap[String, HashSet[AuctionObject]]
+
+    for (sT <- searchTerms) results += sT -> new UnitsScraper().search(sT)
     searchTermSource.close
-    if (newResults isEmpty) {
-      println("  No new results")
-    } else {
-      for (r <- newResults) println(r.toString)
+
+    for (categoryResults <- results) { //[(String, Set[AuctionObject])]
+      val newResults = categoryResults._2 &~ oldObjects.getOrElse(key = categoryResults._1, default = new HashSet[AuctionObject])
+      println(s"Category: ${categoryResults._1}")
+      if (newResults isEmpty) {
+        println(" No new results")
+      } else {
+        for (r <- newResults) println(r.toString)
+      }
     }
     val oos = new ObjectOutputStream(new FileOutputStream(oldObjectsPath))
     oos.writeObject(results)
@@ -59,7 +64,7 @@ object UnitsScraper2 {
 
 class UnitsScraper(searchBaseURL: String = "http://www.units.se/auction/search/?search=") {
 
-  def search(searchParams: String): Set[AuctionObject] = {
+  def search(searchParams: String): HashSet[AuctionObject] = {
     val soup = Jsoup.connect(searchBaseURL + UnitsScraper2.formatAsURL(searchParams)).get
     val items = soup.getElementsByAttributeValueStarting("id", "object")  //all tags with ID:s starting with "object"
 
