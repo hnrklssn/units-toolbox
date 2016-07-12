@@ -4,12 +4,9 @@ import scala.collection.mutable.HashSet
 import scala.collection.mutable.Set
 import scala.collection.concurrent.TrieMap
 import scala.collection.JavaConversions._
-import mapper._
-import scalax.io.JavaConverters._
-import scalax.file.Path
-import scalax.file.defaultfs.DefaultPath
 import scala.util.{Try, Success, Failure}
 import java.io._
+import org.nlogo.util.ClassLoaderObjectInputStream
 
 object UnitsScraper2 {
   private val oldObjectsPath = "oldResults"
@@ -27,13 +24,14 @@ object UnitsScraper2 {
   }
 
   def main(args: Array[String]): Unit = {
-    val ois: Try[ObjectInputStream] = Try(new ObjectInputStream(new FileInputStream(oldObjectsPath)))
+    val ois: Try[ClassLoaderObjectInputStream] = Try(new ClassLoaderObjectInputStream(classLoader = classOf[AuctionObject].getClassLoader,
+                                                                      inputStream = new FileInputStream(oldObjectsPath)))
     val readObjects: Option[HashSet[AuctionObject]] = ois match {
       case Success(stream) => Try(stream.readObject.asInstanceOf[HashSet[AuctionObject]]) match {
         case Success(set) => stream.close; Some(set)
-        case Failure(_) => println("Error, malformed file"); System.exit(1); None //TODO: Handle error acceptably
+        case Failure(_) => println("Error, malformed file"); System.exit(2); None //TODO: Handle error acceptably
       }
-      case x: Failure[ObjectInputStream] => x.failed.get match {
+      case x: Failure[ClassLoaderObjectInputStream] => x.failed.get match {
         case e: FileNotFoundException => None
       }
     }
@@ -43,10 +41,18 @@ object UnitsScraper2 {
     }
     val searchTermSource = scala.io.Source.fromFile("search_terms.txt")
     val searchTerms: Iterator[String] = searchTermSource getLines
-    val newResults = new HashSet[AuctionObject]
-    for (sT <- searchTerms) newResults ++= new UnitsScraper().search(sT)
-    for (r <- newResults) println(r.toString)
+    val results = new HashSet[AuctionObject]
+    for (sT <- searchTerms) results ++= new UnitsScraper().search(sT) //TODO: categorize based on search term
+    val newResults = results &~ oldObjects
     searchTermSource.close
+    if (newResults isEmpty) {
+      println("  No new results")
+    } else {
+      for (r <- newResults) println(r.toString)
+    }
+    val oos = new ObjectOutputStream(new FileOutputStream(oldObjectsPath))
+    oos.writeObject(results)
+    oos.close
   }
 }
 
