@@ -46,7 +46,7 @@ object UnitsScraper2 {
     for (sT <- searchTerms) results += sT -> new UnitsScraper().search(sT)
     searchTermSource.close
 
-    for (categoryResults <- results) { //[(String, Set[AuctionObject])]
+    for (categoryResults <- results) { //[(String, HashSet[AuctionObject])]
       val newResults = categoryResults._2 &~ oldObjects.getOrElse(key = categoryResults._1, default = new HashSet[AuctionObject])
       println(s"Category: ${categoryResults._1}")
       if (newResults isEmpty) {

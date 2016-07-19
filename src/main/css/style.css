@@ -1,0 +1,55 @@
+body {
+  background-image: url("../resources/footer_lodyas.png");
+  background-repeat: repeat;
+}
+
+div {
+
+}
+
+.info {
+  margin: 5px;
+}
+
+.image {
+  float: left;
+  height: 170px;
+  width: 180px;
+  margin: auto;
+}
+
+.data {
+  float: left;
+}
+
+.object {
+  float: left;
+  margin: 10px;
+  width: 800px;
+  background-color: #cccccc;
+  border-style: solid;
+  border-radius: 15px;
+  border-width: medium;
+}
+
+.title {
+  padding-top: 5px;
+  padding-left: 15px;
+  font-size: 15pt;
+  font-family: verdana, sans-serif;
+}
+
+.heading {
+  float: left;
+  width: 150px
+}
+
+img {
+  display: block;
+  margin: auto;
+}
+
+a {
+  color: inherit;
+  text-decoration: inherit;
+}
