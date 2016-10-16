@@ -1,20 +1,24 @@
 import org.jsoup.Jsoup
 import com.github.nscala_time.time.Imports._
 import scala.collection.mutable.HashSet
-import scala.collection.mutable.Set
+import scala.collection.immutable.Set
 import scala.collection.concurrent.TrieMap
 import scala.collection.JavaConversions._
 import scala.util.{Try, Success, Failure}
 import java.io._
 import org.nlogo.util.ClassLoaderObjectInputStream
+import akka.actor.Actor
+import akka.actor.Props
 
-object UnitsScraper2 {
+
+object UnitsScraper {
   private val oldObjectsPath = "oldResults"
 
   //contains all mappings for search parameter characters in URL
   private val substituteMap = new TrieMap[Char, String]
   substituteMap += (
     ' ' -> "+"
+    //TODO: complete map
   )
 
   def formatAsURL(s: String): String = {
@@ -23,49 +27,25 @@ object UnitsScraper2 {
     q.mkString
   }
 
-  def main(args: Array[String]): Unit = {
-    val ois: Try[ClassLoaderObjectInputStream] = Try(new ClassLoaderObjectInputStream(classLoader = classOf[AuctionObject].getClassLoader,
-                                                                      inputStream = new FileInputStream(oldObjectsPath)))
-    val readObjects: Option[TrieMap[String, HashSet[AuctionObject]]] = ois match {
-      case Success(stream) => Try(stream.readObject.asInstanceOf[TrieMap[String, HashSet[AuctionObject]]]) match {
-        case Success(set) => stream.close; Some(set)
-        case Failure(_) => println("Error, malformed file"); System.exit(2); None //TODO: Handle error acceptably
-      }
-      case x: Failure[ClassLoaderObjectInputStream] => x.failed.get match {
-        case e: FileNotFoundException => None
-      }
-    }
-    val oldObjects: TrieMap[String, HashSet[AuctionObject]] = readObjects match {
-      case Some(s) => s
-      case None => new TrieMap[String, HashSet[AuctionObject]]
-    }
-    val searchTermSource = scala.io.Source.fromFile("search_terms.txt")
-    val searchTerms: Iterator[String] = searchTermSource.getLines
-    val results = new TrieMap[String, HashSet[AuctionObject]]
-
-    for (sT <- searchTerms) results += sT -> new UnitsScraper().search(sT)
-    searchTermSource.close
-
-    for (categoryResults <- results) { //[(String, HashSet[AuctionObject])]
-      val newResults = categoryResults._2 &~ oldObjects.getOrElse(key = categoryResults._1, default = new HashSet[AuctionObject])
-      println(s"Category: ${categoryResults._1}")
-      if (newResults isEmpty) {
-        println(" No new results")
-      } else {
-        for (r <- newResults) println(r.toString)
-      }
-    }
-    val oos = new ObjectOutputStream(new FileOutputStream(oldObjectsPath))
-    oos.writeObject(results)
-    oos.close
-  }
+  case object Scan //tells a UnitsScraper to scan the search results and return the results
+  case class SearchResults(results: Set[AuctionObject]) //container to return the results in
 }
 
 
-class UnitsScraper(searchBaseURL: String = "http://www.units.se/auction/search/?search=") {
+class UnitsScraper() extends Actor {
+  import UnitsScraper._ //companion object
 
-  def search(searchParams: String): HashSet[AuctionObject] = {
-    val soup = Jsoup.connect(searchBaseURL + UnitsScraper2.formatAsURL(searchParams)).get
+  val searchBaseURL: String = "http://www.units.se/auction/search/?search="
+
+  val searchParams = self.path.name
+
+  def receive = {
+    case Scan => sender ! SearchResults(search())
+  }
+
+  //scrapes search result page for this query
+  def search(): Set[AuctionObject] = {
+    val soup = Jsoup.connect(searchBaseURL + formatAsURL(searchParams)).get
     val items = soup.getElementsByAttributeValueStarting("id", "object")  //all tags with ID:s starting with "object"
 
     val objects = new HashSet[AuctionObject]
@@ -98,10 +78,20 @@ class UnitsScraper(searchBaseURL: String = "http://www.units.se/auction/search/?
           .toInt ,
         bidder = item
           .getElementsByAttributeValueStarting("id", "bidder")
-          .text
+          .text ,
+        imageLink = item
+          .getElementsByTag("img")
+          .first
+          .attr("abs:src") ,
+        value = item
+          .getElementsByClass("small-6")
+          .last
+          .ownText
+          .replaceAll(raw"\D", "") //keep only the integer value
+          .toInt
       )
     }
-
-    objects
+    //make immutable since the set will be sent to other actors
+    objects.toSet
   }
 }
