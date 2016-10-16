@@ -1,0 +1,40 @@
+    <link rel="stylesheet" type="text/css" href="./style.css" />
+    <link rel="stylesheet" type="text/css" href="./menu.css" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+<!--split--> onload="SetMenuWidth()"<!--split-->
+    <script>
+      function SumWidths(id) {
+        var i = 0;
+        $(id).each(function (index) {
+        i += parseInt($(this).outerWidth(true), 10);
+        });
+        return i;
+      }
+      function SetMenuWidth() {
+        var sum = SumWidths("#menu-items li");
+        $("#center-box").width(sum + 2);
+        $("#bg-one").width(sum - 1);
+      }
+    </script>
+    <div class="preview-html" ng-show="screen == 'preview'" ng-hide="loading">
+      <div class="col-md-12">
+        <div id="cssmenu">
+          <div id="bg-one"></div>
+          <div id="bg-two"></div>
+          <div id="bg-three"></div>
+          <div id="bg-four">
+            <a href="#">
+              <img id="logo" src="./u-tb_logo.png">
+            </a>
+          </div>
+          <div id="center-box">
+            <ul id="menu-items">
+              <li class="home-class"><a href="/">Hem</a></li>
+              <li class="auction-objects-class"><a href="/objects">Auktionsobjekt</a></li>
+              <li class="settings-class"><a href="/config">Inställningar</a></li>
+              <li class="about-class"><a href="/about">Om</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
